@@ -1,27 +1,35 @@
+""" Libraries """
 import pygame
 import sys
 import math
+import random
 
-pygame.init()
+#############################################################################################################################################
 
+pygame.init() # initialises modules
+
+""" Global variables """
 TILE_SIZE = 50
 SCREEN_WIDTH = TILE_SIZE*15
 SCREEN_HEIGHT = TILE_SIZE*11
+PANEL_WIDTH = TILE_SIZE*6
 
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+screen = pygame.display.set_mode((SCREEN_WIDTH + PANEL_WIDTH, SCREEN_HEIGHT))
 clock = pygame.time.Clock()
 
-# starting point of top left corner of square
-CENTRE_SCREEN = [SCREEN_WIDTH/2 - TILE_SIZE/2, SCREEN_HEIGHT/2 - TILE_SIZE/2]
+CENTRE_SCREEN = [SCREEN_WIDTH/2 - TILE_SIZE/2, SCREEN_HEIGHT/2 - TILE_SIZE/2] # starting coordinate of top left corner of square
 
 player = pygame.Rect((CENTRE_SCREEN[0], CENTRE_SCREEN[1], TILE_SIZE, TILE_SIZE))
 r, g, b = 0, 0, 255 # starting colour
 colour_direction = 1 # 1 for up, -1 for down
 
-# for the grid
-dot_colour = (0, 255, 128)  # retro greenish-cyan
+dot_colour = (0, 255, 128)  # retro green
 dot_radius = 2
 
+font = pygame.font.SysFont("Courier", 20, bold=True)
+title_font = pygame.font.SysFont("Courier", 28, bold=True)
+
+""" Function to fade the colour of the playing square """
 def update_color(r, g, b):
     speed = 2
     if r == 255 and g < 255 and b == 0:
@@ -38,15 +46,42 @@ def update_color(r, g, b):
         b -= speed
     return max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b))
 
+""" Function to draw the mastermind panel that tracks goes """
+def draw_mastermind_panel(screen, guesses, feedback):
+    panel_x = SCREEN_WIDTH # panel x is the game panel  
+    screen.fill((20, 20, 20), (panel_x, 0, PANEL_WIDTH, SCREEN_HEIGHT))  # side panel colour
+    
+    # Title
+    title_surf = title_font.render("Mastermove", True, (0, 250, 180))
+    screen.blit(title_surf, (panel_x + 20, 20)) # blit is block transfer. it takes two arguments, a surface and a coordinate (x,y).
+
+    # Draw guess rows
+    for i, guess in enumerate(guesses):
+        y = 70 + i * 45
+        guess_str = " ".join(guess)  # e.g., ↑ ↑ →
+        #guess_surf = font.render(f"{i+1} {guess_str}", True, (0, 250, 180)) # option with number of guesses
+        guess_surf = font.render(f"{guess_str}", True, (0, 250, 180))
+        screen.blit(guess_surf, (panel_x + 20, y))
+        
+        # Draw feedback boxes (black/white squares)
+        for j, outcome in enumerate(feedback[i]): # enumerate loops through items in a list by index j
+            colour_rgb = (255, 20, 147) if outcome == 'miss' else (0, 255, 255) if outcome == 'wrong' else (0, 255, 128)
+            pygame.draw.rect(screen, colour_rgb, (panel_x + 180 + j*20, y + 5, 15, 15))
+            pygame.draw.rect(screen, (50, 50, 50), (panel_x + 180 + j*20, y + 5, 15, 15), 1)  # faint border
+
+#############################################################################################################################################
+
 run = True
 can_move = True
 
+""" Game play """
 while run:
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             run = False
 
+    """ Arrow keys for moving player """
     if event.type == pygame.KEYDOWN and can_move:
         key = pygame.key.get_pressed()
         if key[pygame.K_LEFT] == True:
@@ -62,6 +97,7 @@ while run:
             player.move_ip(0,TILE_SIZE)
             can_move = False
 
+    """ Screen boundary """
     if player.left < 0:
         player.left = 0 
     if player.right > SCREEN_WIDTH:
@@ -74,23 +110,26 @@ while run:
     if event.type == pygame.KEYUP:
         can_move = True
 
+    """ Screen background """
     screen.fill((0,0,0)) # resets the screen to black
 
-    # draws grid
     for x in range(0, SCREEN_WIDTH, TILE_SIZE):
         for y in range(0, SCREEN_HEIGHT, TILE_SIZE):
-            pygame.draw.circle(screen, dot_colour, (x, y), dot_radius)
+            pygame.draw.circle(screen, dot_colour, (x, y), dot_radius) # draws grid of dots
     
     r, g, b = update_color(r, g, b)
 
-    # draw a black square, shrink the coloured square, then draw it in inside the black square
+    """ Square border """
     #pygame.draw.rect(screen, (100, 100, 100), player)
     #inner_rect = player.inflate(-4, -4)
     #pygame.draw.rect(screen, (r, g, b), inner_rect)
     pygame.draw.rect(screen, (r, g, b), player)
 
-    pygame.display.update()
-    clock.tick(90) # 60 frames per second
+    draw_mastermind_panel(screen, [['↑', '↑', '→', '→'],['↑', '↑', '↑', '→']], [['miss', 'miss', 'wrong', 'correct'],['wrong', 'wrong', 'correct', 'wrong']])
+    pygame.display.update()# most important line
+    clock.tick(90) # frames per second
 
 pygame.quit()
 sys.exit()
+
+########################################################################################################################################################################
