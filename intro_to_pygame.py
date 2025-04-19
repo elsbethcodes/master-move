@@ -1,3 +1,4 @@
+
 """ Libraries """
 import pygame
 import sys
@@ -12,7 +13,7 @@ pygame.init() # initialises modules
 TILE_SIZE = 50
 SCREEN_WIDTH = TILE_SIZE*15
 SCREEN_HEIGHT = TILE_SIZE*11
-PANEL_WIDTH = TILE_SIZE*6
+PANEL_WIDTH = TILE_SIZE*5
 
 screen = pygame.display.set_mode((SCREEN_WIDTH + PANEL_WIDTH, SCREEN_HEIGHT))
 clock = pygame.time.Clock()
@@ -28,6 +29,15 @@ dot_radius = 2
 
 font = pygame.font.SysFont("Courier", 20, bold=True)
 title_font = pygame.font.SysFont("Courier", 28, bold=True)
+
+guesses = []
+feedback = []
+sequence = [random.choice(['↑', '↓', '→', '←']) for x in range(4)]
+dict = {'↑':0, '↓':0, '→':0, '←':0}
+for i in sequence:
+    dict[i] +=1
+print(sequence)
+
 
 """ Function to fade the colour of the playing square """
 def update_color(r, g, b):
@@ -62,12 +72,42 @@ def draw_mastermind_panel(screen, guesses, feedback):
         #guess_surf = font.render(f"{i+1} {guess_str}", True, (0, 250, 180)) # option with number of guesses
         guess_surf = font.render(f"{guess_str}", True, (0, 250, 180))
         screen.blit(guess_surf, (panel_x + 20, y))
-        
-        # Draw feedback boxes (black/white squares)
+
+        peg_size = 7
+        spacing = 2
+        peg_x_start = panel_x + 180
+        peg_y_start = y + 5
+
+        ### ISSUE 1: feedback being generated immediately (and not randomly reordering). 
+        # Draw feedback boxes (black/white squares)  
         for j, outcome in enumerate(feedback[i]): # enumerate loops through items in a list by index j
-            colour_rgb = (255, 20, 147) if outcome == 'miss' else (0, 255, 255) if outcome == 'wrong' else (0, 255, 128)
-            pygame.draw.rect(screen, colour_rgb, (panel_x + 180 + j*20, y + 5, 15, 15))
-            pygame.draw.rect(screen, (50, 50, 50), (panel_x + 180 + j*20, y + 5, 15, 15), 1)  # faint border
+            row = j // 2
+            col = j % 2
+            cx = peg_x_start + col * (peg_size * 2 + spacing)
+            cy = peg_y_start + row * (peg_size * 2 + spacing)
+
+            colour_rgb = (0, 0, 0) if outcome == 'miss' else (191, 0, 255) if outcome == 'wrong' else (0, 250, 180)
+            
+            pygame.draw.circle(screen, colour_rgb, (cx, cy), peg_size)
+            pygame.draw.circle(screen, (50, 50, 50), (cx, cy), peg_size, 1) # faint border
+
+def add_item(item, lst):
+    if not lst or len(lst[-1]) == 4:
+        lst.append([item])  # start a new sublist
+    else:
+        lst[-1].append(item)  # add to the last sublist
+
+def response(lst):
+    guess = lst[-1][-1]
+    index = len(lst[-1]) -1
+    if guess == sequence[index]:
+        dict[guess] -= 1
+        return 'correct'
+    elif dict[guess] != 0: ### ISSUE 2: dict isn't being reset for each guess of 4 so we're getting reds where there should be blues. 
+        dict[guess] -= 1
+        return 'wrong'
+    else:
+        return 'miss'
 
 #############################################################################################################################################
 
@@ -87,15 +127,24 @@ while run:
         if key[pygame.K_LEFT] == True:
             player.move_ip(-TILE_SIZE,0)
             can_move = False
+            add_item('←', guesses)
+            add_item(response(guesses),feedback)
         elif key[pygame.K_RIGHT] == True: # using elif instead of if prevents player moving in two directions in one go
             player.move_ip(TILE_SIZE,0)
             can_move = False
+            add_item('→', guesses)
+            add_item(response(guesses),feedback)
         elif key[pygame.K_UP] == True:
             player.move_ip(0,-TILE_SIZE)
             can_move = False
+            add_item('↑', guesses)
+            add_item(response(guesses),feedback)
         elif key[pygame.K_DOWN] == True:
             player.move_ip(0,TILE_SIZE)
             can_move = False
+            add_item('↓', guesses)
+            add_item(response(guesses),feedback)
+
 
     """ Screen boundary """
     if player.left < 0:
@@ -119,13 +168,14 @@ while run:
     
     r, g, b = update_color(r, g, b)
 
-    """ Square border """
+    """ Border on playing square """
     #pygame.draw.rect(screen, (100, 100, 100), player)
     #inner_rect = player.inflate(-4, -4)
     #pygame.draw.rect(screen, (r, g, b), inner_rect)
+
     pygame.draw.rect(screen, (r, g, b), player)
 
-    draw_mastermind_panel(screen, [['↑', '↑', '→', '→'],['↑', '↑', '↑', '→']], [['miss', 'miss', 'wrong', 'correct'],['wrong', 'wrong', 'correct', 'wrong']])
+    draw_mastermind_panel(screen, guesses, feedback)
     pygame.display.update()# most important line
     clock.tick(90) # frames per second
 
