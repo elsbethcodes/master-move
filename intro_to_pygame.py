@@ -34,7 +34,7 @@ title_font = pygame.font.SysFont("Courier", 28, bold=True)
 guesses = []
 feedback = []
 sequence = [random.choice(['↑', '↓', '→', '←']) for x in range(4)]
-print(sequence)
+#print(sequence) #check
 
 
 """ Function to fade the colour of the playing square """
@@ -167,30 +167,16 @@ while run:
 
     """ Screen boundary """
     if player.left < 0:
-        player.left = 0 
-    if player.right > SCREEN_WIDTH:
-        player.right = SCREEN_WIDTH 
+        player.right = SCREEN_WIDTH
+    elif player.right > SCREEN_WIDTH:
+        player.left = 0
     if player.top < 0:
-        player.top = 0 
-    if player.bottom > SCREEN_HEIGHT:
-        player.bottom = SCREEN_HEIGHT 
+        player.bottom = SCREEN_HEIGHT
+    elif player.bottom > SCREEN_HEIGHT:
+        player.top = 0
 
     if event.type == pygame.KEYUP:
         can_move = True
-
-    if feedback: # checks feedback is non-empty
-        if c == GOES*4 or feedback[-1] == ['correct','correct','correct','correct']:
-            can_move = False
-            # ISSUE: words not showing
-            if c == GOES*4:
-                y1 = 70 + GOES * 45
-                game_over_surf = font.render("Game Over", True, (0, 250, 180))
-                screen.blit(game_over_surf, (SCREEN_WIDTH + 20, y1))
-            if feedback[-1] == ['correct','correct','correct','correct']:
-                y2 = 70 + len(feedback) * 45
-                game_complete_surf = font.render("Game Complete", True, (0, 250, 180))
-                screen.blit(game_complete_surf, (SCREEN_WIDTH + 20, y2))
-
 
 
     """ Screen background """
@@ -211,6 +197,20 @@ while run:
     pygame.draw.rect(screen, (r, g, b), player)
 
     draw_mastermind_panel(screen, guesses, feedback)
+
+    if feedback: # checks feedback is non-empty
+        if c == GOES*4 or feedback[-1] == ['correct','correct','correct','correct']:
+            can_move = False
+            if c == GOES*4:
+                y1 = 70 + GOES * 45
+                sequence_print = "".join(str(x) for x in sequence)
+                game_over_surf = font.render(f"Solution: {sequence_print}", True, (0, 250, 180))
+                screen.blit(game_over_surf, (SCREEN_WIDTH + 20, y1))
+            if feedback[-1] == ['correct','correct','correct','correct']:
+                y2 = 70 + len(feedback) * 45
+                game_complete_surf = font.render("Game Complete", True, (0, 250, 180))
+                screen.blit(game_complete_surf, (SCREEN_WIDTH + 20, y2))
+    
     pygame.display.update()# most important line
     clock.tick(90) # frames per second
 
