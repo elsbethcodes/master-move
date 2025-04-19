@@ -1,4 +1,3 @@
-
 """ Libraries """
 import pygame
 import sys
@@ -7,13 +6,14 @@ import random
 
 #############################################################################################################################################
 
-pygame.init() # initialises modules
+pygame.init() # initialises all pygame modules
 
 """ Global variables """
 TILE_SIZE = 50
 SCREEN_WIDTH = TILE_SIZE*15
-SCREEN_HEIGHT = TILE_SIZE*11
+SCREEN_HEIGHT = TILE_SIZE*13
 PANEL_WIDTH = TILE_SIZE*5
+GOES = 12
 
 screen = pygame.display.set_mode((SCREEN_WIDTH + PANEL_WIDTH, SCREEN_HEIGHT))
 clock = pygame.time.Clock()
@@ -30,12 +30,10 @@ dot_radius = 2
 font = pygame.font.SysFont("Courier", 20, bold=True)
 title_font = pygame.font.SysFont("Courier", 28, bold=True)
 
+""" Global lists """
 guesses = []
 feedback = []
 sequence = [random.choice(['↑', '↓', '→', '←']) for x in range(4)]
-dict = {'↑':0, '↓':0, '→':0, '←':0}
-for i in sequence:
-    dict[i] +=1
 print(sequence)
 
 
@@ -58,61 +56,75 @@ def update_color(r, g, b):
 
 """ Function to draw the mastermind panel that tracks goes """
 def draw_mastermind_panel(screen, guesses, feedback):
-    panel_x = SCREEN_WIDTH # panel x is the game panel  
-    screen.fill((20, 20, 20), (panel_x, 0, PANEL_WIDTH, SCREEN_HEIGHT))  # side panel colour
-    
+    panel_x = SCREEN_WIDTH
+    screen.fill((20, 20, 20), (panel_x, 0, PANEL_WIDTH, SCREEN_HEIGHT))  # Side panel background
+
     # Title
     title_surf = title_font.render("Mastermove", True, (0, 250, 180))
-    screen.blit(title_surf, (panel_x + 20, 20)) # blit is block transfer. it takes two arguments, a surface and a coordinate (x,y).
+    screen.blit(title_surf, (panel_x + 20, 20))
 
     # Draw guess rows
     for i, guess in enumerate(guesses):
         y = 70 + i * 45
-        guess_str = " ".join(guess)  # e.g., ↑ ↑ →
-        #guess_surf = font.render(f"{i+1} {guess_str}", True, (0, 250, 180)) # option with number of guesses
-        guess_surf = font.render(f"{guess_str}", True, (0, 250, 180))
+        guess_str = " ".join(guess)
+        guess_surf = font.render(f"{i+1}  {guess_str}", True, (0, 250, 180))
         screen.blit(guess_surf, (panel_x + 20, y))
 
-        peg_size = 7
-        spacing = 2
-        peg_x_start = panel_x + 180
-        peg_y_start = y + 5
+        # Only draw feedback if this guess has 4 arrows
+        if len(guess) == 4 and i < len(feedback):
+            peg_size = 7
+            spacing = 2
+            peg_x_start = panel_x + 180
+            peg_y_start = y + 5
 
-        ### ISSUE 1: feedback being generated immediately (and not randomly reordering). 
-        # Draw feedback boxes (black/white squares)  
-        for j, outcome in enumerate(feedback[i]): # enumerate loops through items in a list by index j
-            row = j // 2
-            col = j % 2
-            cx = peg_x_start + col * (peg_size * 2 + spacing)
-            cy = peg_y_start + row * (peg_size * 2 + spacing)
+            for j, outcome in enumerate(feedback[i]):
+                row = j // 2
+                col = j % 2
+                cx = peg_x_start + col * (peg_size * 2 + spacing)
+                cy = peg_y_start + row * (peg_size * 2 + spacing)
 
-            colour_rgb = (0, 0, 0) if outcome == 'miss' else (191, 0, 255) if outcome == 'wrong' else (0, 250, 180)
-            
-            pygame.draw.circle(screen, colour_rgb, (cx, cy), peg_size)
-            pygame.draw.circle(screen, (50, 50, 50), (cx, cy), peg_size, 1) # faint border
+                colour_rgb = (
+                    (0, 0, 0) if outcome == 'miss'
+                    else (191, 0, 255) if outcome == 'incorrect position'
+                    else (0, 250, 180)
+                )
 
+                pygame.draw.circle(screen, colour_rgb, (cx, cy), peg_size)
+                pygame.draw.circle(screen, (50, 50, 50), (cx, cy), peg_size, 1)
+
+# add_item allows a move to be added to guesses, in a new sublist if this is the first guess or a a guess of 4 moves has been completed 
 def add_item(item, lst):
     if not lst or len(lst[-1]) == 4:
         lst.append([item])  # start a new sublist
     else:
         lst[-1].append(item)  # add to the last sublist
 
-def response(lst):
-    guess = lst[-1][-1]
-    index = len(lst[-1]) -1
-    if guess == sequence[index]:
-        dict[guess] -= 1
-        return 'correct'
-    elif dict[guess] != 0: ### ISSUE 2: dict isn't being reset for each guess of 4 so we're getting reds where there should be blues. 
-        dict[guess] -= 1
-        return 'wrong'
-    else:
-        return 'miss'
+def get_feedback(guess, solution):
+    feedback = []
+    temp_solution = solution.copy()
+    temp_guess = guess.copy()
+
+    # First pass – correct position and symbol
+    for i in range(4):
+        if temp_guess[i] == temp_solution[i]:
+            feedback.append('correct')
+            temp_solution[i] = None
+            temp_guess[i] = None
+
+    # Second pass – correct symbol, incorrect position
+    for i in range(4):
+        if temp_guess[i] is not None and temp_guess[i] in temp_solution:
+            feedback.append('incorrect position')
+            temp_solution[temp_solution.index(temp_guess[i])] = None
+        elif temp_guess[i] is not None:
+            feedback.append('miss')
+    return feedback
 
 #############################################################################################################################################
 
 run = True
 can_move = True
+c = 0 # counter
 
 """ Game play """
 while run:
@@ -126,25 +138,32 @@ while run:
         key = pygame.key.get_pressed()
         if key[pygame.K_LEFT] == True:
             player.move_ip(-TILE_SIZE,0)
-            can_move = False
+            can_move = False # stops the playing square moving again for a sustained keypress
             add_item('←', guesses)
-            add_item(response(guesses),feedback)
+            if len(guesses[-1]) == 4:
+                feedback.append(sorted(get_feedback(guesses[-1], sequence)))
+            c+=1
         elif key[pygame.K_RIGHT] == True: # using elif instead of if prevents player moving in two directions in one go
             player.move_ip(TILE_SIZE,0)
             can_move = False
             add_item('→', guesses)
-            add_item(response(guesses),feedback)
+            if len(guesses[-1]) == 4:
+                feedback.append(sorted(get_feedback(guesses[-1], sequence)))
+            c+=1
         elif key[pygame.K_UP] == True:
             player.move_ip(0,-TILE_SIZE)
             can_move = False
             add_item('↑', guesses)
-            add_item(response(guesses),feedback)
+            if len(guesses[-1]) == 4:
+                feedback.append(sorted(get_feedback(guesses[-1], sequence)))
+            c+=1
         elif key[pygame.K_DOWN] == True:
             player.move_ip(0,TILE_SIZE)
             can_move = False
             add_item('↓', guesses)
-            add_item(response(guesses),feedback)
-
+            if len(guesses[-1]) == 4:
+                feedback.append(sorted(get_feedback(guesses[-1], sequence)))
+            c+=1
 
     """ Screen boundary """
     if player.left < 0:
@@ -159,12 +178,28 @@ while run:
     if event.type == pygame.KEYUP:
         can_move = True
 
+    if feedback: # checks feedback is non-empty
+        if c == GOES*4 or feedback[-1] == ['correct','correct','correct','correct']:
+            can_move = False
+            # ISSUE: words not showing
+            if c == GOES*4:
+                y1 = 70 + GOES * 45
+                game_over_surf = font.render("Game Over", True, (0, 250, 180))
+                screen.blit(game_over_surf, (SCREEN_WIDTH + 20, y1))
+            if feedback[-1] == ['correct','correct','correct','correct']:
+                y2 = 70 + len(feedback) * 45
+                game_complete_surf = font.render("Game Complete", True, (0, 250, 180))
+                screen.blit(game_complete_surf, (SCREEN_WIDTH + 20, y2))
+
+
+
     """ Screen background """
     screen.fill((0,0,0)) # resets the screen to black
 
     for x in range(0, SCREEN_WIDTH, TILE_SIZE):
         for y in range(0, SCREEN_HEIGHT, TILE_SIZE):
             pygame.draw.circle(screen, dot_colour, (x, y), dot_radius) # draws grid of dots
+            # pygame.draw.circle(screen, dot_colour, (x, y), dot_radius) # can replace the above with this line for the grid to change colour like the playing square
     
     r, g, b = update_color(r, g, b)
 
