@@ -120,6 +120,32 @@ def get_feedback(guess, solution):
             feedback.append('miss')
     return feedback
 
+# Skull setup
+PIXEL_SIZE = 5
+skull_sprite = [
+    [0,1,1,1,1,1,0],
+    [1,1,1,1,1,1,1],
+    [1,0,1,1,1,0,1],
+    [1,0,0,1,0,0,1],
+    [1,1,1,1,1,1,1],
+    [0,1,1,1,1,1,0],
+    [0,1,0,1,0,1,0],
+]
+SKULL_MOVE_INTERVAL = 2000
+skull_timer = pygame.time.get_ticks()
+skull_tile = [0, 0]  # skull grid position (x, y)
+
+def draw_skull(x, y, color=(255,255,255)):
+    for row_idx, row in enumerate(skull_sprite):
+        for col_idx, pixel in enumerate(row):
+            if pixel:
+                rect = pygame.Rect(
+                    x + col_idx * PIXEL_SIZE,
+                    y + row_idx * PIXEL_SIZE,
+                    PIXEL_SIZE, PIXEL_SIZE
+                )
+                pygame.draw.rect(screen, color, rect)
+
 #############################################################################################################################################
 
 run = True
@@ -132,6 +158,24 @@ while run:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             run = False
+
+    # Skull pixel position
+    skull_px = skull_tile[0] * TILE_SIZE
+    skull_py = skull_tile[1] * TILE_SIZE
+
+    # Skull moves every 2 seconds toward player
+    current_time = pygame.time.get_ticks()
+    if current_time - skull_timer >= SKULL_MOVE_INTERVAL and can_move:
+        skull_timer = current_time
+
+        # Calculate direction
+        dx = player.x - skull_tile[0] * TILE_SIZE
+        dy = player.y - skull_tile[1] * TILE_SIZE
+
+        if abs(dx) > abs(dy):
+            skull_tile[0] += 1 if dx > 0 else -1
+        elif dy != 0:
+            skull_tile[1] += 1 if dy > 0 else -1
 
     """ Arrow keys for moving player """
     if event.type == pygame.KEYDOWN and can_move:
@@ -195,8 +239,24 @@ while run:
     #pygame.draw.rect(screen, (r, g, b), inner_rect)
 
     pygame.draw.rect(screen, (r, g, b), player)
+    draw_skull(skull_px, skull_py)
 
     draw_mastermind_panel(screen, guesses, feedback)
+
+    # Check collision with skull
+    if player.x == skull_px and player.y == skull_py:
+        for i in range(4):  # two flashes
+            pygame.draw.rect(screen, (0, 0, 0), player)
+            pygame.display.update()
+            pygame.time.delay(150)
+            pygame.draw.rect(screen, (255, 255, 255), player)
+            pygame.display.update()
+            pygame.time.delay(150)
+        game_over_text = title_font.render("Game Over", True, (255, 20, 147))
+        screen.blit(game_over_text, (SCREEN_WIDTH//2 - 80, SCREEN_HEIGHT//2 - 20))
+        pygame.display.update()
+        pygame.time.delay(2000)
+        run = False
 
     if feedback: # checks feedback is non-empty
         if c == GOES*4 or feedback[-1] == ['correct','correct','correct','correct']:
@@ -204,7 +264,7 @@ while run:
             if c == GOES*4:
                 y1 = 70 + GOES * 45
                 sequence_print = "".join(str(x) for x in sequence)
-                game_over_surf = font.render(f"Solution: {sequence_print}", True, (0, 250, 180))
+                game_over_surf = font.render(f"Game Lost: {sequence_print}", True, (0, 250, 180))
                 screen.blit(game_over_surf, (SCREEN_WIDTH + 20, y1))
             if feedback[-1] == ['correct','correct','correct','correct']:
                 y2 = 70 + len(feedback) * 45
